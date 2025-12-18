@@ -1,12 +1,8 @@
 #---------------------------------------------------------
-# USAGE: You must move this document into a folder where 
-# you have all documents you used for the testbench.
-# I recommend you to make a folder with a softlink to each 
-# document and also this code.
-# !!! The algorithm to study was ment to a data base where 
-# each stock and year has 12 documents: 1 per month
+# USAGE: Move this file into the folder containing your 
+# testbench results. Ensure 'saved_data.csv' and all 
+# 'oanda-*.csv' price files are present.
 #---------------------------------------------------------
-
 
 # ---------------------------------------------------------
 # 1. Configuration & Libraries
@@ -22,49 +18,71 @@ library(stringr)
 library(ggplot2)
 
 # File containing the bot's annual performance
-summary_file <- "saved_data_no_outlayers.csv" 
+summary_file <- "saved_data.csv" 
 
 if (!file.exists(summary_file)) stop(paste("ERROR: File not found:", summary_file))
 
 # ---------------------------------------------------------
-# 2. Data Processing Function
+# 2. Load and Filter Reference Data
 # ---------------------------------------------------------
-process_volatility <- function() {
+# Load summary data to identify valid years based on ROI thresholds
+bot_data_raw <- read.csv(summary_file)
+
+cat("Total rows in summary file:", nrow(bot_data_raw), "\n")
+
+# --- ANTI-OUTLIER FILTER ---
+# Exclude any year where Bot or Standard Market ROI is > 200%
+bot_data_filtered <- bot_data_raw[
+  bot_data_raw$roi_bot < 200 & 
+  bot_data_raw$roi_std < 200, 
+]
+
+cat("Rows after removing Outliers (>200% ROI):", nrow(bot_data_filtered), "\n")
+cat("-------------------------------------------------\n")
+
+# ---------------------------------------------------------
+# 3. Data Processing Function
+# ---------------------------------------------------------
+process_volatility <- function(valid_data) {
   
-  # Search for all Oanda CSV files in the current directory
-  # Note: Adjust path if files are located in a subdirectory
-  files <- list.files(pattern = "^oanda-.*\\.csv$") # This pattern is from the data base I used to try my bot.
+  # Search for Oanda CSV files
+  files <- list.files(pattern = "^oanda-.*\\.csv$") 
   
-  if(length(files) == 0) stop("No 'oanda-*.csv' files found in the directory.")
+  if(length(files) == 0) stop("No 'oanda-*.csv' files found.")
   
-  cat("Found", length(files), "price files. Filtering and calculating...\n")
+  cat("Found", length(files), "price files. Checking against filter list...\n")
   
   results_list <- list()
   
+  # Create a lookup key "STOCK_YEAR" for valid entries
+  allowed_keys <- paste(valid_data$stock, valid_data$year, sep = "_")
+  
   for (f in files) {
-    # Extract metadata from filename (e.g., oanda-NAS100_USD-2005-1.csv)
+    # Extract metadata from filename
     file_name <- basename(f)
     parts <- str_split(file_name, "-")[[1]]
     
     if (length(parts) < 3) next 
     
-    stock_raw <- parts[2] # e.g., "NAS100_USD"
-    year_raw <- parts[3]  # e.g., "2005"
+    stock_raw <- parts[2] 
+    year_raw <- parts[3]  
     
-    # Filter: Exclude Bitcoin (BTC) from analysis
-    if (grepl("BTC", stock_raw)) {
-      next
-    }
-    
-    # Standardize stock name to match summary file (NAS100_USD -> NAS100)
+    # Standardize stock name
     stock_clean <- str_replace(stock_raw, "_USD", "")
+    
+    # --- FILTER CHECK ---
+    # Only process files that exist in the filtered summary list
+    current_key <- paste(stock_clean, year_raw, sep = "_")
+    
+    if (!(current_key %in% allowed_keys)) {
+      next 
+    }
     
     # Read file and calculate volatility
     tryCatch({
-      # Load only the 'close' column for performance
       df <- read_csv(f, col_types = cols_only(close = col_double()), show_col_types = FALSE)
       
-      # Calculate Volatility: Sum of absolute percentage changes
+      # Volatility = Sum of absolute percentage changes
       pct_changes <- abs(diff(df$close) / head(df$close, -1))
       partial_vol <- sum(pct_changes, na.rm = TRUE) * 100
       
@@ -78,7 +96,7 @@ process_volatility <- function() {
     })
   }
   
-  if (length(results_list) == 0) stop("No valid data processed (check if files exist or only contain BTC).")
+  if (length(results_list) == 0) stop("No valid data processed.")
 
   all_partials <- do.call(rbind, results_list)
   
@@ -92,49 +110,42 @@ process_volatility <- function() {
 }
 
 # ---------------------------------------------------------
-# 3. Execution & Verification
+# 4. Execution & Verification
 # ---------------------------------------------------------
 
 # A. Calculation
-cat("Calculating volatility (Excluding BTC)...\n")
-vol_index <- process_volatility()
+cat("Calculating volatility for valid years...\n")
+vol_index <- process_volatility(bot_data_filtered)
 
-# B. Output results to console
+# B. Output results
 cat("\n=================================================\n")
 cat(" CALCULATED ANNUAL VOLATILITY INDEX\n")
-cat(" (Sum of all price movements within the year)\n")
 cat("=================================================\n")
 print(as.data.frame(vol_index))
 cat("=================================================\n\n")
 
-# C. Load bot performance data
-bot_data <- read.csv(summary_file)
-
-# D. Merge datasets
-# Inner join ensures only matching Stock+Year combinations are kept
-merged_data <- inner_join(bot_data, vol_index, by = c("stock", "year"))
+# C. Merge datasets
+merged_data <- inner_join(bot_data_filtered, vol_index, by = c("stock", "year"))
 
 cat("DATA MERGE VERIFICATION:\n")
-cat("Rows in summary file:", nrow(bot_data), "\n")
-cat("Years of volatility calculated:", nrow(vol_index), "\n")
-cat("Successfully merged rows:", nrow(merged_data), "\n\n")
+cat("Valid rows in summary:", nrow(bot_data_filtered), "\n")
+cat("Years calculated:", nrow(vol_index), "\n")
+cat("Merged rows:", nrow(merged_data), "\n\n")
 
 if (nrow(merged_data) == 0) {
-  stop("CRITICAL ERROR: No matching rows found. Please check if Stock names match (e.g., 'NAS100' vs 'NAS100_USD').")
+  stop("CRITICAL ERROR: No matching rows found.")
 } else {
   cat("CONFIRMATION: Successfully matched", nrow(merged_data), "years of data.\n")
-  cat("Sample of merged data:\n")
   print(head(merged_data[, c("stock", "year", "roi_bot", "volatility_index")]))
 }
 
 # ---------------------------------------------------------
-# 4. Correlation Analysis & Plotting
+# 5. Correlation Analysis & Plotting
 # ---------------------------------------------------------
 merged_data$alpha <- merged_data$roi_bot - merged_data$roi_std
 
 if (nrow(merged_data) >= 3) {
   
-  # Perform correlation test
   cor_test <- cor.test(merged_data$volatility_index, merged_data$alpha)
   
   cat("\n--- FINAL RESULTS ---\n")
@@ -146,8 +157,8 @@ if (nrow(merged_data) >= 3) {
     geom_point(aes(color = stock), size = 3) +
     geom_smooth(method = "lm", se = FALSE, color = "black", linetype = "dashed") +
     labs(
-      title = "Bot Alpha vs Annual Volatility (No BTC)",
-      subtitle = paste("R =", round(cor_test$estimate, 3)),
+      title = "Bot Alpha vs Annual Volatility (Outliers removed)",
+      subtitle = paste("R =", round(cor_test$estimate, 3), "| ROI > 200% excluded"),
       x = "Total Volatility Index",
       y = "Bot Alpha (ROI Bot - ROI Std)"
     ) +
