@@ -24,7 +24,7 @@ struct AmericanFormat : std::numpunct<char> {
 std::atomic<double> current_budget(I_BUDGET); // Initial Capital
 std::atomic<int> shares_owned(0);
 std::atomic<double> last_known_price(0.0);
-std::fstream data = std::fstream("data_collection.csv");
+std::fstream data = std::fstream("../studing_the_bot/data.csv");
 char sep = ',';
 std::ifstream return_channel("trading_pipe");
 
