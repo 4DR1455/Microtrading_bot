@@ -16,6 +16,8 @@ if (!file.exists(filename)) {
 }
 
 data <- read.csv(filename)
+#--- foutlayers filter ---
+data <- data[data$roi_bot < 200 & data$roi_std < 200, ]
 
 # ---------------------------------------------------------
 # 2. Calculations (FIXED)
