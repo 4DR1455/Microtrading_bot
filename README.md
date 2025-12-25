@@ -80,7 +80,7 @@ To continue the project, I should acquire a larger dataset so I can generate mor
 
 ## Conclusion
 
-To conclude this summary of my work, I would like to recap everything accomplished. I developed two concurrent programs. The first implements the trading logic ("The Brain"), which uses a linear prediction model to determine if a stock is performing better or worse than expected. It then decides to sell or buy an amount determined by a specific geometric formula that enforces more aggressive operations as prices diverge, managing portfolio distribution via a hash map of price ranges. The second program ("The Hands") reads data from datasets, sends it to the Brain, awaits its response, executes the decided operations, and simulates a 0.1% trading fee.
+To conclude this paper of my work, I would like to recap everything accomplished. I developed two concurrent programs. The first implements the trading logic ("The Brain"), which uses a linear prediction model to determine if a stock is performing better or worse than expected. It then decides to sell or buy an amount determined by a specific geometric formula that enforces more aggressive operations as prices diverge, managing portfolio distribution via a hash map of price ranges. The second program ("The Hands") reads data from datasets, sends it to the Brain, awaits its response, executes the decided operations, and simulates a 0.1% trading fee.
 
 At the end of each simulated year, the system calculates the profit that a simple buy-and-hold strategy would have performed (applying the same buying fee) and compares this performance, outputting the results to a CSV document.
 
