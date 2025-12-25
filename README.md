@@ -12,25 +12,25 @@ The key innovation was the implementation of a custom "starting point" for each 
 
 I have developed a system composed of two concurrent programs designed to simulate, with maximum accuracy, the real-world operation of the bot as conceptualized:
 
-The Hands (Execution Module)
+### The Hands (Execution Module)
 
 This program is responsible for executing operations (during the test bench, it also simulates the broker API). It is written in C++ to ensure maximum speed and error-free order execution, simplifying communication with the API.
 
-The Brain (Logic Module)
+### The Brain (Logic Module)
 
 This program determines which operations to perform. It is developed in OCaml, a robust functional language chosen to ensure that the thinking logic and data structure management remain stable and crash-proof.
 
 Both modules communicate and exchange orders using pipes.
 
-How the Brain Works
+#### How the Brain Works
 
 The core of the project lies within the "Brain's" logic, which maintains three persistent data structures between operations:
 
-Accumulated Change: Calculated as past accumulated change * change from last price (formatted where 1.0 = 100%).
+- Accumulated Change: Calculated as past accumulated change * change from last price (formatted where 1.0 = 100%).
 
-Range Map (Hash Map): Keys represent the ranges, and values represent the quantity of shares per range.
+- Range Map (Hash Map): Keys represent the ranges, and values represent the quantity of shares per range.
 
-Recent Changes Queue: A queue of the last n changes, where n is a customizable variable defining the bot's tolerance to general trends.
+- Recent Changes Queue: A queue of the last n changes, where n is a customizable variable defining the bot's tolerance to general trends.
 
 For every new price update, the Brain evaluates whether the stock has outperformed the prediction derived from recent movements. If performance is better, it sells; if worse, it buys; if it follows the trend, it holds.
 
@@ -64,7 +64,7 @@ Mean Ratio: 1.13x
 
 $$[1.04x , 1.22x]$$
 
-Important Note: I simulated a 0.1% broker commission on purchases. Therefore, both the market and the bot ROIs reflect this reduction in their real ROI. You can find the data for these intervals at “studying_the_bot/no_outlayers_data.csv”.
+Important Note: I simulated a 0.1% broker commission on purchases. Therefore, both the market and the bot ROIs reflect this reduction in their real ROI. You can find the data for these intervals at “studying_the_bot/no_outliers_data.csv”.
 
 Based on these intervals, we can state with 95% confidence that the bot outperforms the standard market.
 
@@ -73,3 +73,15 @@ Volatility Analysis
 I also investigated the hypothesis that outperformance increases with market volatility. I summed the absolute variation of each year for every stock and compared it against the ROI Difference. The obtained correlation was 31.33%, indicating no strong correlation between these parameters.
 
 However, I observed that outliers tend to appear only when volatility is relatively high, though I currently lack sufficient data to prove this conclusively.
+
+## 4. NEXT STEPS
+
+To continue the project, I should acquire a larger dataset so I can generate more outliers and study the appearance of these outliers. This way, I can understand which conditions make these outliers appear, allowing me to trade with the most profitable stocks. Also, I should find a broker that allows me to trade with an API so I can implement this bot for my own profit.
+
+## Conclusion
+
+To conclude this summary of my work, I would like to recap everything accomplished. I developed two concurrent programs. The first implements the trading logic ("The Brain"), which uses a linear prediction model to determine if a stock is performing better or worse than expected. It then decides to sell or buy an amount determined by a specific geometric formula that enforces more aggressive operations as prices diverge, managing portfolio distribution via a hash map of price ranges. The second program ("The Hands") reads data from datasets, sends it to the Brain, awaits its response, executes the decided operations, and simulates a 0.1% trading fee.
+
+At the end of each simulated year, the system calculates the profit that a simple buy-and-hold strategy would have performed (applying the same buying fee) and compares this performance, outputting the results to a CSV document.
+
+Findings: I discovered that this bot **outperforms** the market with **95% confidence**. Additionally, I observed specific cases where the bot achieves exceptionally high returns—a phenomenon that I would like to study further in the future.
