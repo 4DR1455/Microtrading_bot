@@ -1,4 +1,4 @@
-stock,year,roi_bot,roi_std,diff_bot_minus_no_bot,to_check,out_layer
+stock,year,roi_bot,roi_std,diff_bot_minus_no_bot,to_check,outlieer
 NAS100,2005,6.52203,1.37576,5.14627,,
 NAS100,2006,8.43575,6.72427,1.71148,,
 NAS100,2007,25.6577,18.031,7.62669,,
