@@ -48,21 +48,21 @@ The confidence intervals for market outperformance are as follows:
 
 ROI Difference (Percentage Points):
 
-Mean Difference: 12.18%
+Mean Difference: 4.964 %
 
 95% Confidence Interval:
 
 $$
-[4.71\\% , 19.65\\%]
+[3.271\\% , 6.657\\%]
 $$
 
 Efficiency Ratio (Wealth Ratio):
 
-Mean Ratio: 1.13x
+Mean Ratio: 1.0506x
 
 95% Confidence Interval:
 
-$$[1.04x , 1.22x]$$
+$$[1.0345x , 1.0668x]$$
 
 <!--Important Note: I simulated a 0.1% broker commission on purchases. Therefore, both the market and the bot ROIs reflect this reduction in their real ROI. You can find the data for these intervals at “studying_the_bot/no_outliers_data.csv”.-->
 
@@ -85,5 +85,3 @@ To conclude this paper of my work, I would like to recap everything accomplished
 At the end of each simulated year, the system calculates the profit that a simple buy-and-hold strategy would have performed <!--(applying the same buying fee)--> and compares this performance, outputting the results to a CSV document.
 
 Findings: I discovered that this bot **outperforms** the market with **95% confidence**. Additionally, I observed specific cases where the bot achieves exceptionally high returns—a phenomenon that I would like to study further in the future.
-
-#### !!! There is an inconsistency at data, I'm working on it.
