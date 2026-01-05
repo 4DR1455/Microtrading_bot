@@ -95,7 +95,6 @@ void listen_to_brain() {
     // --- EXECUTE BUY ---
     if (order.find("BUY") == 0) {
         int qty = parse_quantity(order);
-        // Apply broker fee of 0.1%
         double cost = (price * qty);
         if (current_budget >= cost) {
             current_budget = current_budget - cost; 
