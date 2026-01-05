@@ -64,11 +64,11 @@ Mean Ratio: 1.13x
 
 $$[1.04x , 1.22x]$$
 
-Important Note: I simulated a 0.1% broker commission on purchases. Therefore, both the market and the bot ROIs reflect this reduction in their real ROI. You can find the data for these intervals at “studying_the_bot/no_outliers_data.csv”.
+<!--Important Note: I simulated a 0.1% broker commission on purchases. Therefore, both the market and the bot ROIs reflect this reduction in their real ROI. You can find the data for these intervals at “studying_the_bot/no_outliers_data.csv”.-->
 
 Based on these intervals, we can state with 95% confidence that the bot outperforms the standard market.
 
-Volatility Analysis
+### Volatility Analysis
 
 I also investigated the hypothesis that outperformance increases with market volatility. I summed the absolute variation of each year for every stock and compared it against the ROI Difference. The obtained correlation was 31.33%, indicating no strong correlation between these parameters.
 
@@ -80,8 +80,10 @@ To continue the project, I should acquire a larger dataset so I can generate mor
 
 ## Conclusion
 
-To conclude this paper of my work, I would like to recap everything accomplished. I developed two concurrent programs. The first implements the trading logic ("The Brain"), which uses a linear prediction model to determine if a stock is performing better or worse than expected. It then decides to sell or buy an amount determined by a specific geometric formula that enforces more aggressive operations as prices diverge, managing portfolio distribution via a hash map of price ranges. The second program ("The Hands") reads data from datasets, sends it to the Brain, awaits its response, executes the decided operations, and simulates a 0.1% trading fee.
+To conclude this paper of my work, I would like to recap everything accomplished. I developed two concurrent programs. The first implements the trading logic ("The Brain"), which uses a linear prediction model to determine if a stock is performing better or worse than expected. It then decides to sell or buy an amount determined by a specific geometric formula that enforces more aggressive operations as prices diverge, managing portfolio distribution via a hash map of price ranges. The second program ("The Hands") reads data from datasets, sends it to the Brain, awaits its response, executes the decided operations<!--, and simulates a 0.1% trading fee-->.
 
-At the end of each simulated year, the system calculates the profit that a simple buy-and-hold strategy would have performed (applying the same buying fee) and compares this performance, outputting the results to a CSV document.
+At the end of each simulated year, the system calculates the profit that a simple buy-and-hold strategy would have performed <!--(applying the same buying fee)--> and compares this performance, outputting the results to a CSV document.
 
 Findings: I discovered that this bot **outperforms** the market with **95% confidence**. Additionally, I observed specific cases where the bot achieves exceptionally high returns—a phenomenon that I would like to study further in the future.
+
+#### !!! There is an inconsistency at data, I'm working on it.
