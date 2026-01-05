@@ -39,7 +39,7 @@ void sumry(float initial_budget, float price, int shares, float f_price) {
     //std::cerr << "  Initial budget = " << std::setprecision(2) << std::fixed << initial_budget << "€" << std::endl;
     //std::cerr << "  Final budget = " << std::setprecision(2) << std::fixed << current_welth << "€" << std::endl;
 
-    float std_roi = (((price - f_price) / f_price) * 100) * 0.999;
+    float std_roi = (((price - f_price) / f_price) * 100);
 
     data << std::setprecision(6) << bot_roi << ',' << std_roi << ',' << bot_roi - std_roi << std::endl;
 }
@@ -96,7 +96,7 @@ void listen_to_brain() {
     if (order.find("BUY") == 0) {
         int qty = parse_quantity(order);
         // Apply broker fee of 0.1%
-        double cost = (price * qty)  * 0.999;
+        double cost = (price * qty);
         if (current_budget >= cost) {
             current_budget = current_budget - cost; 
             shares_owned += qty;
