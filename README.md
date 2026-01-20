@@ -48,21 +48,21 @@ The confidence intervals for market outperformance are as follows:
 
 ROI Difference (Percentage Points):
 
-Mean Difference: 4.964 %
+Mean Difference: 3.989 %
 
 95% Confidence Interval:
 
 $$
-[3.271\\% , 6.657\\%]
+[2.172\\% , 5.805\\%]
 $$
 
 Efficiency Ratio (Wealth Ratio):
 
-Mean Ratio: 1.0506x
+Mean Ratio: 1.0432x
 
 95% Confidence Interval:
 
-$$[1.0345x , 1.0668x]$$
+$$[1.024x , 1.0625x]$$
 
 <!--Important Note: I simulated a 0.1% broker commission on purchases. Therefore, both the market and the bot ROIs reflect this reduction in their real ROI. You can find the data for these intervals at “studying_the_bot/no_outliers_data.csv”.-->
 
