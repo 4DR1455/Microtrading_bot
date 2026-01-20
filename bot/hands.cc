@@ -6,8 +6,8 @@
 #include <thread>
 #include <mutex>
 #include <iomanip>
-#include <unistd.h>     
-#include <sys/wait.h>   
+#include <unistd.h>      
+#include <sys/wait.h>    
 #include <cstring>
 #include <signal.h>
 #include <thread>
@@ -20,14 +20,14 @@ std::fstream data_file;
 
 // --- UTILS ---
 
-// Funció segura per llegir una línia completa d'un Pipe (lletra a lletra)
-// Això evita que llegeixis mitja ordre o dues ordres juntes
+// Safe function to read a complete line from a Pipe (char by char)
+// This prevents reading half an order or two orders together
 std::string readline_pipe(int fd) {
     std::string line;
     char c;
     while (true) {
         int n = read(fd, &c, 1);
-        if (n <= 0) break; // Error o Pipe tancat
+        if (n <= 0) break; // Error or Pipe closed
         if (c == '\n') break;
         line += c;
     }
@@ -61,7 +61,6 @@ void sumry(float initial_budget, float price, int shares, float f_price, std::st
     }
 }
 
-// ... (Les funcions extract_open_price, extract_close_price i parse_quantity són iguals que les teves) ...
 double extract_open_price(const std::string& line) {
     std::stringstream ss(line);
     std::string segment;
@@ -91,7 +90,7 @@ int parse_quantity(const std::string& order) {
 
 void listen_to_brain(int fd_read, float& current_budget, int& shares_owned, double current_price, std::thread::id index) {
     
-    // FEM SERVIR LA LECTURA SEGURA
+    // USE SAFE READING
     std::string order = readline_pipe(fd_read);
     
     if (order.empty()) return;
@@ -106,11 +105,6 @@ void listen_to_brain(int fd_read, float& current_budget, int& shares_owned, doub
             current_budget -= cost; 
             shares_owned += qty;
         }
-        // Output protegit amb Mutex per evitar línies barrejades
-        /*{
-            std::lock_guard<std::mutex> lock(data_mutex);
-            std::cout << index << "+ " << std::flush;
-        }*/
     } 
     else if (order.find("SELL") == 0) {
         int qty = parse_quantity(order);
@@ -119,20 +113,10 @@ void listen_to_brain(int fd_read, float& current_budget, int& shares_owned, doub
             current_budget += revenue;
             shares_owned -= qty;
         }
-        /*{
-            std::lock_guard<std::mutex> lock(data_mutex);
-            std::cout << index << "- " << std::flush;
-        }*/
     } 
-    else {
-        /*{
-            std::lock_guard<std::mutex> lock(data_mutex);
-            std::cout << index << "· " << std::flush;
-        }*/
-    }
 }
 
-//The hands algorithm itself
+// The hands algorithm itself
 void* data_feed(void * arg) {
     std::vector<std::string> *filenames = static_cast<std::vector<std::string>*>(arg);
 
@@ -159,7 +143,7 @@ void* data_feed(void * arg) {
         close(pipe_from_brain[1]);
 
         execlp(BRAIN_EXEC.c_str(), "brain", nullptr);
-        perror("Exec failed (Check if ./brain exists!)"); // Missatge d'error si falla
+        perror("Exec failed (Check if ./brain exists!)"); // Error message if fails
         exit(1);
     }
 
@@ -189,12 +173,12 @@ void* data_feed(void * arg) {
             double price = extract_open_price(line);
             if (first) { f_price = price; first = false; }
 
-            // Només enviem si el preu és vàlid
+            // Only send if the price is valid
             if (price > 0.0) {
                 last_known_price = price;
                 std::string msg = std::to_string(current_budget) + ";" + std::to_string(price) + ";" + std::to_string(shares_owned) + "\n";
                 
-                // Ignorar SIGPIPE en cas que el brain hagi mort
+                // Ignore SIGPIPE in case the brain process has died
                 if (write(pipe_to_brain[1], msg.c_str(), msg.size()) == -1) break;
                 
                 listen_to_brain(pipe_from_brain[0], current_budget, shares_owned, last_known_price, std::this_thread::get_id());
@@ -226,9 +210,9 @@ void* data_feed(void * arg) {
     pthread_exit(nullptr);
 }
 
-//multithreading system
+// Multithreading system
 int main() {
-    // IMPORTANTE: Ignorar senyal de trencament de pipe per evitar crash global
+    // IMPORTANT: Ignore pipe break signal to prevent global crash
     signal(SIGPIPE, SIG_IGN);
 
     data_file.open("data.csv", std::ios::out);
@@ -239,1039 +223,65 @@ int main() {
 
     // Data Source
     std::vector<std::vector<std::string>> data_set = {
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2005/oanda-NAS100_USD-2005-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2005/oanda-NAS100_USD-2005-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2005/oanda-NAS100_USD-2005-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2005/oanda-NAS100_USD-2005-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2005/oanda-NAS100_USD-2005-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2005/oanda-NAS100_USD-2005-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2005/oanda-NAS100_USD-2005-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2005/oanda-NAS100_USD-2005-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2005/oanda-NAS100_USD-2005-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2005/oanda-NAS100_USD-2005-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2005/oanda-NAS100_USD-2005-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2005/oanda-NAS100_USD-2005-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2006/oanda-NAS100_USD-2006-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2006/oanda-NAS100_USD-2006-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2006/oanda-NAS100_USD-2006-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2006/oanda-NAS100_USD-2006-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2006/oanda-NAS100_USD-2006-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2006/oanda-NAS100_USD-2006-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2006/oanda-NAS100_USD-2006-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2006/oanda-NAS100_USD-2006-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2006/oanda-NAS100_USD-2006-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2006/oanda-NAS100_USD-2006-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2006/oanda-NAS100_USD-2006-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2006/oanda-NAS100_USD-2006-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2007/oanda-NAS100_USD-2007-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2007/oanda-NAS100_USD-2007-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2007/oanda-NAS100_USD-2007-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2007/oanda-NAS100_USD-2007-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2007/oanda-NAS100_USD-2007-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2007/oanda-NAS100_USD-2007-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2007/oanda-NAS100_USD-2007-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2007/oanda-NAS100_USD-2007-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2007/oanda-NAS100_USD-2007-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2007/oanda-NAS100_USD-2007-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2007/oanda-NAS100_USD-2007-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2007/oanda-NAS100_USD-2007-12.csv"
-        },
-        /*{
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2008/oanda-NAS100_USD-2008-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2008/oanda-NAS100_USD-2008-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2008/oanda-NAS100_USD-2008-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2008/oanda-NAS100_USD-2008-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2008/oanda-NAS100_USD-2008-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2008/oanda-NAS100_USD-2008-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2008/oanda-NAS100_USD-2008-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2008/oanda-NAS100_USD-2008-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2008/oanda-NAS100_USD-2008-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2008/oanda-NAS100_USD-2008-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2008/oanda-NAS100_USD-2008-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2008/oanda-NAS100_USD-2008-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2009/oanda-NAS100_USD-2009-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2009/oanda-NAS100_USD-2009-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2009/oanda-NAS100_USD-2009-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2009/oanda-NAS100_USD-2009-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2009/oanda-NAS100_USD-2009-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2009/oanda-NAS100_USD-2009-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2009/oanda-NAS100_USD-2009-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2009/oanda-NAS100_USD-2009-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2009/oanda-NAS100_USD-2009-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2009/oanda-NAS100_USD-2009-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2009/oanda-NAS100_USD-2009-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2009/oanda-NAS100_USD-2009-12.csv"
-        },*/
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2010/oanda-NAS100_USD-2010-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2010/oanda-NAS100_USD-2010-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2010/oanda-NAS100_USD-2010-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2010/oanda-NAS100_USD-2010-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2010/oanda-NAS100_USD-2010-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2010/oanda-NAS100_USD-2010-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2010/oanda-NAS100_USD-2010-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2010/oanda-NAS100_USD-2010-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2010/oanda-NAS100_USD-2010-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2010/oanda-NAS100_USD-2010-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2010/oanda-NAS100_USD-2010-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2010/oanda-NAS100_USD-2010-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2011/oanda-NAS100_USD-2011-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2011/oanda-NAS100_USD-2011-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2011/oanda-NAS100_USD-2011-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2011/oanda-NAS100_USD-2011-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2011/oanda-NAS100_USD-2011-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2011/oanda-NAS100_USD-2011-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2011/oanda-NAS100_USD-2011-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2011/oanda-NAS100_USD-2011-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2011/oanda-NAS100_USD-2011-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2011/oanda-NAS100_USD-2011-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2011/oanda-NAS100_USD-2011-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2011/oanda-NAS100_USD-2011-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2012/oanda-NAS100_USD-2012-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2012/oanda-NAS100_USD-2012-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2012/oanda-NAS100_USD-2012-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2012/oanda-NAS100_USD-2012-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2012/oanda-NAS100_USD-2012-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2012/oanda-NAS100_USD-2012-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2012/oanda-NAS100_USD-2012-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2012/oanda-NAS100_USD-2012-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2012/oanda-NAS100_USD-2012-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2012/oanda-NAS100_USD-2012-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2012/oanda-NAS100_USD-2012-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2012/oanda-NAS100_USD-2012-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2013/oanda-NAS100_USD-2013-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2013/oanda-NAS100_USD-2013-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2013/oanda-NAS100_USD-2013-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2013/oanda-NAS100_USD-2013-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2013/oanda-NAS100_USD-2013-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2013/oanda-NAS100_USD-2013-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2013/oanda-NAS100_USD-2013-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2013/oanda-NAS100_USD-2013-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2013/oanda-NAS100_USD-2013-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2013/oanda-NAS100_USD-2013-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2013/oanda-NAS100_USD-2013-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2013/oanda-NAS100_USD-2013-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2014/oanda-NAS100_USD-2014-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2014/oanda-NAS100_USD-2014-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2014/oanda-NAS100_USD-2014-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2014/oanda-NAS100_USD-2014-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2014/oanda-NAS100_USD-2014-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2014/oanda-NAS100_USD-2014-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2014/oanda-NAS100_USD-2014-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2014/oanda-NAS100_USD-2014-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2014/oanda-NAS100_USD-2014-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2014/oanda-NAS100_USD-2014-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2014/oanda-NAS100_USD-2014-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2014/oanda-NAS100_USD-2014-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2015/oanda-NAS100_USD-2015-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2015/oanda-NAS100_USD-2015-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2015/oanda-NAS100_USD-2015-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2015/oanda-NAS100_USD-2015-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2015/oanda-NAS100_USD-2015-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2015/oanda-NAS100_USD-2015-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2015/oanda-NAS100_USD-2015-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2015/oanda-NAS100_USD-2015-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2015/oanda-NAS100_USD-2015-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2015/oanda-NAS100_USD-2015-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2015/oanda-NAS100_USD-2015-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2015/oanda-NAS100_USD-2015-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2016/oanda-NAS100_USD-2016-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2016/oanda-NAS100_USD-2016-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2016/oanda-NAS100_USD-2016-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2016/oanda-NAS100_USD-2016-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2016/oanda-NAS100_USD-2016-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2016/oanda-NAS100_USD-2016-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2016/oanda-NAS100_USD-2016-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2016/oanda-NAS100_USD-2016-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2016/oanda-NAS100_USD-2016-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2016/oanda-NAS100_USD-2016-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2016/oanda-NAS100_USD-2016-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2016/oanda-NAS100_USD-2016-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2017/oanda-NAS100_USD-2017-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2017/oanda-NAS100_USD-2017-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2017/oanda-NAS100_USD-2017-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2017/oanda-NAS100_USD-2017-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2017/oanda-NAS100_USD-2017-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2017/oanda-NAS100_USD-2017-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2017/oanda-NAS100_USD-2017-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2017/oanda-NAS100_USD-2017-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2017/oanda-NAS100_USD-2017-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2017/oanda-NAS100_USD-2017-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2017/oanda-NAS100_USD-2017-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2017/oanda-NAS100_USD-2017-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2018/oanda-NAS100_USD-2018-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2018/oanda-NAS100_USD-2018-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2018/oanda-NAS100_USD-2018-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2018/oanda-NAS100_USD-2018-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2018/oanda-NAS100_USD-2018-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2018/oanda-NAS100_USD-2018-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2018/oanda-NAS100_USD-2018-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2018/oanda-NAS100_USD-2018-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2018/oanda-NAS100_USD-2018-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2018/oanda-NAS100_USD-2018-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2018/oanda-NAS100_USD-2018-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2018/oanda-NAS100_USD-2018-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2005/oanda-NATGAS_USD-2005-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2005/oanda-NATGAS_USD-2005-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2005/oanda-NATGAS_USD-2005-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2005/oanda-NATGAS_USD-2005-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2005/oanda-NATGAS_USD-2005-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2005/oanda-NATGAS_USD-2005-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2005/oanda-NATGAS_USD-2005-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2005/oanda-NATGAS_USD-2005-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2005/oanda-NATGAS_USD-2005-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2005/oanda-NATGAS_USD-2005-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2005/oanda-NATGAS_USD-2005-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2005/oanda-NATGAS_USD-2005-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2006/oanda-NATGAS_USD-2006-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2006/oanda-NATGAS_USD-2006-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2006/oanda-NATGAS_USD-2006-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2006/oanda-NATGAS_USD-2006-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2006/oanda-NATGAS_USD-2006-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2006/oanda-NATGAS_USD-2006-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2006/oanda-NATGAS_USD-2006-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2006/oanda-NATGAS_USD-2006-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2006/oanda-NATGAS_USD-2006-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2006/oanda-NATGAS_USD-2006-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2006/oanda-NATGAS_USD-2006-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2006/oanda-NATGAS_USD-2006-12.csv"
-        },
-        /*{
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2007/oanda-NATGAS_USD-2007-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2007/oanda-NATGAS_USD-2007-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2007/oanda-NATGAS_USD-2007-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2007/oanda-NATGAS_USD-2007-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2007/oanda-NATGAS_USD-2007-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2007/oanda-NATGAS_USD-2007-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2007/oanda-NATGAS_USD-2007-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2007/oanda-NATGAS_USD-2007-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2007/oanda-NATGAS_USD-2007-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2007/oanda-NATGAS_USD-2007-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2007/oanda-NATGAS_USD-2007-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2007/oanda-NATGAS_USD-2007-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2008/oanda-NATGAS_USD-2008-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2008/oanda-NATGAS_USD-2008-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2008/oanda-NATGAS_USD-2008-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2008/oanda-NATGAS_USD-2008-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2008/oanda-NATGAS_USD-2008-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2008/oanda-NATGAS_USD-2008-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2008/oanda-NATGAS_USD-2008-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2008/oanda-NATGAS_USD-2008-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2008/oanda-NATGAS_USD-2008-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2008/oanda-NATGAS_USD-2008-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2008/oanda-NATGAS_USD-2008-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2008/oanda-NATGAS_USD-2008-12.csv"
-        },*/
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2009/oanda-NATGAS_USD-2009-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2009/oanda-NATGAS_USD-2009-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2009/oanda-NATGAS_USD-2009-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2009/oanda-NATGAS_USD-2009-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2009/oanda-NATGAS_USD-2009-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2009/oanda-NATGAS_USD-2009-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2009/oanda-NATGAS_USD-2009-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2009/oanda-NATGAS_USD-2009-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2009/oanda-NATGAS_USD-2009-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2009/oanda-NATGAS_USD-2009-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2009/oanda-NATGAS_USD-2009-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2009/oanda-NATGAS_USD-2009-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2010/oanda-NATGAS_USD-2010-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2010/oanda-NATGAS_USD-2010-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2010/oanda-NATGAS_USD-2010-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2010/oanda-NATGAS_USD-2010-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2010/oanda-NATGAS_USD-2010-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2010/oanda-NATGAS_USD-2010-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2010/oanda-NATGAS_USD-2010-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2010/oanda-NATGAS_USD-2010-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2010/oanda-NATGAS_USD-2010-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2010/oanda-NATGAS_USD-2010-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2010/oanda-NATGAS_USD-2010-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2010/oanda-NATGAS_USD-2010-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2011/oanda-NATGAS_USD-2011-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2011/oanda-NATGAS_USD-2011-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2011/oanda-NATGAS_USD-2011-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2011/oanda-NATGAS_USD-2011-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2011/oanda-NATGAS_USD-2011-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2011/oanda-NATGAS_USD-2011-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2011/oanda-NATGAS_USD-2011-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2011/oanda-NATGAS_USD-2011-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2011/oanda-NATGAS_USD-2011-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2011/oanda-NATGAS_USD-2011-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2011/oanda-NATGAS_USD-2011-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2011/oanda-NATGAS_USD-2011-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2012/oanda-NATGAS_USD-2012-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2012/oanda-NATGAS_USD-2012-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2012/oanda-NATGAS_USD-2012-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2012/oanda-NATGAS_USD-2012-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2012/oanda-NATGAS_USD-2012-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2012/oanda-NATGAS_USD-2012-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2012/oanda-NATGAS_USD-2012-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2012/oanda-NATGAS_USD-2012-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2012/oanda-NATGAS_USD-2012-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2012/oanda-NATGAS_USD-2012-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2012/oanda-NATGAS_USD-2012-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2012/oanda-NATGAS_USD-2012-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2013/oanda-NATGAS_USD-2013-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2013/oanda-NATGAS_USD-2013-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2013/oanda-NATGAS_USD-2013-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2013/oanda-NATGAS_USD-2013-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2013/oanda-NATGAS_USD-2013-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2013/oanda-NATGAS_USD-2013-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2013/oanda-NATGAS_USD-2013-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2013/oanda-NATGAS_USD-2013-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2013/oanda-NATGAS_USD-2013-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2013/oanda-NATGAS_USD-2013-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2013/oanda-NATGAS_USD-2013-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2013/oanda-NATGAS_USD-2013-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2014/oanda-NATGAS_USD-2014-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2014/oanda-NATGAS_USD-2014-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2014/oanda-NATGAS_USD-2014-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2014/oanda-NATGAS_USD-2014-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2014/oanda-NATGAS_USD-2014-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2014/oanda-NATGAS_USD-2014-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2014/oanda-NATGAS_USD-2014-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2014/oanda-NATGAS_USD-2014-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2014/oanda-NATGAS_USD-2014-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2014/oanda-NATGAS_USD-2014-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2014/oanda-NATGAS_USD-2014-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2014/oanda-NATGAS_USD-2014-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2015/oanda-NATGAS_USD-2015-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2015/oanda-NATGAS_USD-2015-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2015/oanda-NATGAS_USD-2015-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2015/oanda-NATGAS_USD-2015-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2015/oanda-NATGAS_USD-2015-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2015/oanda-NATGAS_USD-2015-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2015/oanda-NATGAS_USD-2015-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2015/oanda-NATGAS_USD-2015-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2015/oanda-NATGAS_USD-2015-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2015/oanda-NATGAS_USD-2015-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2015/oanda-NATGAS_USD-2015-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2015/oanda-NATGAS_USD-2015-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2016/oanda-NATGAS_USD-2016-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2016/oanda-NATGAS_USD-2016-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2016/oanda-NATGAS_USD-2016-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2016/oanda-NATGAS_USD-2016-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2016/oanda-NATGAS_USD-2016-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2016/oanda-NATGAS_USD-2016-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2016/oanda-NATGAS_USD-2016-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2016/oanda-NATGAS_USD-2016-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2016/oanda-NATGAS_USD-2016-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2016/oanda-NATGAS_USD-2016-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2016/oanda-NATGAS_USD-2016-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2016/oanda-NATGAS_USD-2016-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2017/oanda-NATGAS_USD-2017-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2017/oanda-NATGAS_USD-2017-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2017/oanda-NATGAS_USD-2017-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2017/oanda-NATGAS_USD-2017-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2017/oanda-NATGAS_USD-2017-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2017/oanda-NATGAS_USD-2017-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2017/oanda-NATGAS_USD-2017-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2017/oanda-NATGAS_USD-2017-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2017/oanda-NATGAS_USD-2017-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2017/oanda-NATGAS_USD-2017-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2017/oanda-NATGAS_USD-2017-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2017/oanda-NATGAS_USD-2017-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2018/oanda-NATGAS_USD-2018-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2018/oanda-NATGAS_USD-2018-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2018/oanda-NATGAS_USD-2018-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2018/oanda-NATGAS_USD-2018-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2018/oanda-NATGAS_USD-2018-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2018/oanda-NATGAS_USD-2018-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2018/oanda-NATGAS_USD-2018-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2018/oanda-NATGAS_USD-2018-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2018/oanda-NATGAS_USD-2018-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2018/oanda-NATGAS_USD-2018-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2018/oanda-NATGAS_USD-2018-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NATGAS_USD/2018/oanda-NATGAS_USD-2018-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2005/oanda-SPX500_USD-2005-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2005/oanda-SPX500_USD-2005-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2005/oanda-SPX500_USD-2005-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2005/oanda-SPX500_USD-2005-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2005/oanda-SPX500_USD-2005-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2005/oanda-SPX500_USD-2005-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2005/oanda-SPX500_USD-2005-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2005/oanda-SPX500_USD-2005-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2005/oanda-SPX500_USD-2005-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2005/oanda-SPX500_USD-2005-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2005/oanda-SPX500_USD-2005-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2005/oanda-SPX500_USD-2005-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2006/oanda-SPX500_USD-2006-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2006/oanda-SPX500_USD-2006-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2006/oanda-SPX500_USD-2006-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2006/oanda-SPX500_USD-2006-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2006/oanda-SPX500_USD-2006-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2006/oanda-SPX500_USD-2006-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2006/oanda-SPX500_USD-2006-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2006/oanda-SPX500_USD-2006-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2006/oanda-SPX500_USD-2006-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2006/oanda-SPX500_USD-2006-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2006/oanda-SPX500_USD-2006-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2006/oanda-SPX500_USD-2006-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2007/oanda-SPX500_USD-2007-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2007/oanda-SPX500_USD-2007-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2007/oanda-SPX500_USD-2007-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2007/oanda-SPX500_USD-2007-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2007/oanda-SPX500_USD-2007-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2007/oanda-SPX500_USD-2007-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2007/oanda-SPX500_USD-2007-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2007/oanda-SPX500_USD-2007-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2007/oanda-SPX500_USD-2007-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2007/oanda-SPX500_USD-2007-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2007/oanda-SPX500_USD-2007-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2007/oanda-SPX500_USD-2007-12.csv"
-        },
-        /*{
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2008/oanda-SPX500_USD-2008-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2008/oanda-SPX500_USD-2008-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2008/oanda-SPX500_USD-2008-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2008/oanda-SPX500_USD-2008-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2008/oanda-SPX500_USD-2008-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2008/oanda-SPX500_USD-2008-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2008/oanda-SPX500_USD-2008-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2008/oanda-SPX500_USD-2008-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2008/oanda-SPX500_USD-2008-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2008/oanda-SPX500_USD-2008-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2008/oanda-SPX500_USD-2008-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2008/oanda-SPX500_USD-2008-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2009/oanda-SPX500_USD-2009-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2009/oanda-SPX500_USD-2009-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2009/oanda-SPX500_USD-2009-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2009/oanda-SPX500_USD-2009-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2009/oanda-SPX500_USD-2009-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2009/oanda-SPX500_USD-2009-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2009/oanda-SPX500_USD-2009-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2009/oanda-SPX500_USD-2009-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2009/oanda-SPX500_USD-2009-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2009/oanda-SPX500_USD-2009-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2009/oanda-SPX500_USD-2009-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2009/oanda-SPX500_USD-2009-12.csv"
-        },*/
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2010/oanda-SPX500_USD-2010-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2010/oanda-SPX500_USD-2010-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2010/oanda-SPX500_USD-2010-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2010/oanda-SPX500_USD-2010-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2010/oanda-SPX500_USD-2010-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2010/oanda-SPX500_USD-2010-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2010/oanda-SPX500_USD-2010-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2010/oanda-SPX500_USD-2010-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2010/oanda-SPX500_USD-2010-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2010/oanda-SPX500_USD-2010-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2010/oanda-SPX500_USD-2010-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2010/oanda-SPX500_USD-2010-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2011/oanda-SPX500_USD-2011-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2011/oanda-SPX500_USD-2011-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2011/oanda-SPX500_USD-2011-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2011/oanda-SPX500_USD-2011-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2011/oanda-SPX500_USD-2011-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2011/oanda-SPX500_USD-2011-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2011/oanda-SPX500_USD-2011-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2011/oanda-SPX500_USD-2011-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2011/oanda-SPX500_USD-2011-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2011/oanda-SPX500_USD-2011-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2011/oanda-SPX500_USD-2011-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2011/oanda-SPX500_USD-2011-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2012/oanda-SPX500_USD-2012-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2012/oanda-SPX500_USD-2012-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2012/oanda-SPX500_USD-2012-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2012/oanda-SPX500_USD-2012-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2012/oanda-SPX500_USD-2012-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2012/oanda-SPX500_USD-2012-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2012/oanda-SPX500_USD-2012-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2012/oanda-SPX500_USD-2012-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2012/oanda-SPX500_USD-2012-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2012/oanda-SPX500_USD-2012-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2012/oanda-SPX500_USD-2012-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2012/oanda-SPX500_USD-2012-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2013/oanda-SPX500_USD-2013-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2013/oanda-SPX500_USD-2013-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2013/oanda-SPX500_USD-2013-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2013/oanda-SPX500_USD-2013-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2013/oanda-SPX500_USD-2013-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2013/oanda-SPX500_USD-2013-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2013/oanda-SPX500_USD-2013-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2013/oanda-SPX500_USD-2013-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2013/oanda-SPX500_USD-2013-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2013/oanda-SPX500_USD-2013-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2013/oanda-SPX500_USD-2013-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2013/oanda-SPX500_USD-2013-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2014/oanda-SPX500_USD-2014-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2014/oanda-SPX500_USD-2014-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2014/oanda-SPX500_USD-2014-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2014/oanda-SPX500_USD-2014-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2014/oanda-SPX500_USD-2014-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2014/oanda-SPX500_USD-2014-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2014/oanda-SPX500_USD-2014-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2014/oanda-SPX500_USD-2014-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2014/oanda-SPX500_USD-2014-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2014/oanda-SPX500_USD-2014-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2014/oanda-SPX500_USD-2014-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2014/oanda-SPX500_USD-2014-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2015/oanda-SPX500_USD-2015-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2015/oanda-SPX500_USD-2015-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2015/oanda-SPX500_USD-2015-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2015/oanda-SPX500_USD-2015-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2015/oanda-SPX500_USD-2015-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2015/oanda-SPX500_USD-2015-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2015/oanda-SPX500_USD-2015-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2015/oanda-SPX500_USD-2015-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2015/oanda-SPX500_USD-2015-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2015/oanda-SPX500_USD-2015-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2015/oanda-SPX500_USD-2015-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2015/oanda-SPX500_USD-2015-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2016/oanda-SPX500_USD-2016-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2016/oanda-SPX500_USD-2016-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2016/oanda-SPX500_USD-2016-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2016/oanda-SPX500_USD-2016-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2016/oanda-SPX500_USD-2016-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2016/oanda-SPX500_USD-2016-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2016/oanda-SPX500_USD-2016-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2016/oanda-SPX500_USD-2016-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2016/oanda-SPX500_USD-2016-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2016/oanda-SPX500_USD-2016-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2016/oanda-SPX500_USD-2016-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2016/oanda-SPX500_USD-2016-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2017/oanda-SPX500_USD-2017-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2017/oanda-SPX500_USD-2017-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2017/oanda-SPX500_USD-2017-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2017/oanda-SPX500_USD-2017-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2017/oanda-SPX500_USD-2017-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2017/oanda-SPX500_USD-2017-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2017/oanda-SPX500_USD-2017-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2017/oanda-SPX500_USD-2017-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2017/oanda-SPX500_USD-2017-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2017/oanda-SPX500_USD-2017-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2017/oanda-SPX500_USD-2017-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2017/oanda-SPX500_USD-2017-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2018/oanda-SPX500_USD-2018-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2018/oanda-SPX500_USD-2018-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2018/oanda-SPX500_USD-2018-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2018/oanda-SPX500_USD-2018-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2018/oanda-SPX500_USD-2018-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2018/oanda-SPX500_USD-2018-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2018/oanda-SPX500_USD-2018-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2018/oanda-SPX500_USD-2018-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2018/oanda-SPX500_USD-2018-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2018/oanda-SPX500_USD-2018-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2018/oanda-SPX500_USD-2018-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/SPX500_USD/2018/oanda-SPX500_USD-2018-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2005/oanda-UK100_GBP-2005-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2005/oanda-UK100_GBP-2005-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2005/oanda-UK100_GBP-2005-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2005/oanda-UK100_GBP-2005-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2005/oanda-UK100_GBP-2005-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2005/oanda-UK100_GBP-2005-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2005/oanda-UK100_GBP-2005-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2005/oanda-UK100_GBP-2005-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2005/oanda-UK100_GBP-2005-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2005/oanda-UK100_GBP-2005-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2005/oanda-UK100_GBP-2005-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2005/oanda-UK100_GBP-2005-12.csv",
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2006/oanda-UK100_GBP-2006-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2006/oanda-UK100_GBP-2006-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2006/oanda-UK100_GBP-2006-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2006/oanda-UK100_GBP-2006-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2006/oanda-UK100_GBP-2006-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2006/oanda-UK100_GBP-2006-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2006/oanda-UK100_GBP-2006-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2006/oanda-UK100_GBP-2006-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2006/oanda-UK100_GBP-2006-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2006/oanda-UK100_GBP-2006-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2006/oanda-UK100_GBP-2006-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2006/oanda-UK100_GBP-2006-12.csv",
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2007/oanda-UK100_GBP-2007-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2007/oanda-UK100_GBP-2007-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2007/oanda-UK100_GBP-2007-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2007/oanda-UK100_GBP-2007-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2007/oanda-UK100_GBP-2007-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2007/oanda-UK100_GBP-2007-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2007/oanda-UK100_GBP-2007-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2007/oanda-UK100_GBP-2007-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2007/oanda-UK100_GBP-2007-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2007/oanda-UK100_GBP-2007-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2007/oanda-UK100_GBP-2007-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2007/oanda-UK100_GBP-2007-12.csv",
-        },
-        /*{
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2008/oanda-UK100_GBP-2008-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2008/oanda-UK100_GBP-2008-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2008/oanda-UK100_GBP-2008-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2008/oanda-UK100_GBP-2008-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2008/oanda-UK100_GBP-2008-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2008/oanda-UK100_GBP-2008-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2008/oanda-UK100_GBP-2008-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2008/oanda-UK100_GBP-2008-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2008/oanda-UK100_GBP-2008-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2008/oanda-UK100_GBP-2008-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2008/oanda-UK100_GBP-2008-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2008/oanda-UK100_GBP-2008-12.csv",
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2009/oanda-UK100_GBP-2009-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2009/oanda-UK100_GBP-2009-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2009/oanda-UK100_GBP-2009-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2009/oanda-UK100_GBP-2009-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2009/oanda-UK100_GBP-2009-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2009/oanda-UK100_GBP-2009-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2009/oanda-UK100_GBP-2009-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2009/oanda-UK100_GBP-2009-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2009/oanda-UK100_GBP-2009-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2009/oanda-UK100_GBP-2009-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2009/oanda-UK100_GBP-2009-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2009/oanda-UK100_GBP-2009-12.csv",
-        },*/
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2010/oanda-UK100_GBP-2010-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2010/oanda-UK100_GBP-2010-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2010/oanda-UK100_GBP-2010-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2010/oanda-UK100_GBP-2010-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2010/oanda-UK100_GBP-2010-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2010/oanda-UK100_GBP-2010-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2010/oanda-UK100_GBP-2010-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2010/oanda-UK100_GBP-2010-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2010/oanda-UK100_GBP-2010-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2010/oanda-UK100_GBP-2010-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2010/oanda-UK100_GBP-2010-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2010/oanda-UK100_GBP-2010-12.csv",
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2011/oanda-UK100_GBP-2011-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2011/oanda-UK100_GBP-2011-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2011/oanda-UK100_GBP-2011-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2011/oanda-UK100_GBP-2011-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2011/oanda-UK100_GBP-2011-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2011/oanda-UK100_GBP-2011-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2011/oanda-UK100_GBP-2011-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2011/oanda-UK100_GBP-2011-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2011/oanda-UK100_GBP-2011-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2011/oanda-UK100_GBP-2011-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2011/oanda-UK100_GBP-2011-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2011/oanda-UK100_GBP-2011-12.csv",
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2012/oanda-UK100_GBP-2012-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2012/oanda-UK100_GBP-2012-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2012/oanda-UK100_GBP-2012-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2012/oanda-UK100_GBP-2012-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2012/oanda-UK100_GBP-2012-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2012/oanda-UK100_GBP-2012-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2012/oanda-UK100_GBP-2012-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2012/oanda-UK100_GBP-2012-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2012/oanda-UK100_GBP-2012-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2012/oanda-UK100_GBP-2012-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2012/oanda-UK100_GBP-2012-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2012/oanda-UK100_GBP-2012-12.csv",
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2013/oanda-UK100_GBP-2013-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2013/oanda-UK100_GBP-2013-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2013/oanda-UK100_GBP-2013-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2013/oanda-UK100_GBP-2013-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2013/oanda-UK100_GBP-2013-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2013/oanda-UK100_GBP-2013-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2013/oanda-UK100_GBP-2013-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2013/oanda-UK100_GBP-2013-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2013/oanda-UK100_GBP-2013-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2013/oanda-UK100_GBP-2013-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2013/oanda-UK100_GBP-2013-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2013/oanda-UK100_GBP-2013-12.csv",
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2014/oanda-UK100_GBP-2014-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2014/oanda-UK100_GBP-2014-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2014/oanda-UK100_GBP-2014-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2014/oanda-UK100_GBP-2014-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2014/oanda-UK100_GBP-2014-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2014/oanda-UK100_GBP-2014-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2014/oanda-UK100_GBP-2014-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2014/oanda-UK100_GBP-2014-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2014/oanda-UK100_GBP-2014-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2014/oanda-UK100_GBP-2014-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2014/oanda-UK100_GBP-2014-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2014/oanda-UK100_GBP-2014-12.csv",
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2015/oanda-UK100_GBP-2015-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2015/oanda-UK100_GBP-2015-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2015/oanda-UK100_GBP-2015-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2015/oanda-UK100_GBP-2015-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2015/oanda-UK100_GBP-2015-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2015/oanda-UK100_GBP-2015-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2015/oanda-UK100_GBP-2015-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2015/oanda-UK100_GBP-2015-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2015/oanda-UK100_GBP-2015-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2015/oanda-UK100_GBP-2015-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2015/oanda-UK100_GBP-2015-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2015/oanda-UK100_GBP-2015-12.csv",
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2016/oanda-UK100_GBP-2016-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2016/oanda-UK100_GBP-2016-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2016/oanda-UK100_GBP-2016-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2016/oanda-UK100_GBP-2016-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2016/oanda-UK100_GBP-2016-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2016/oanda-UK100_GBP-2016-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2016/oanda-UK100_GBP-2016-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2016/oanda-UK100_GBP-2016-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2016/oanda-UK100_GBP-2016-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2016/oanda-UK100_GBP-2016-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2016/oanda-UK100_GBP-2016-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2016/oanda-UK100_GBP-2016-12.csv",
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2017/oanda-UK100_GBP-2017-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2017/oanda-UK100_GBP-2017-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2017/oanda-UK100_GBP-2017-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2017/oanda-UK100_GBP-2017-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2017/oanda-UK100_GBP-2017-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2017/oanda-UK100_GBP-2017-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2017/oanda-UK100_GBP-2017-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2017/oanda-UK100_GBP-2017-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2017/oanda-UK100_GBP-2017-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2017/oanda-UK100_GBP-2017-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2017/oanda-UK100_GBP-2017-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2017/oanda-UK100_GBP-2017-12.csv",
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2018/oanda-UK100_GBP-2018-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2018/oanda-UK100_GBP-2018-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2018/oanda-UK100_GBP-2018-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2018/oanda-UK100_GBP-2018-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2018/oanda-UK100_GBP-2018-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2018/oanda-UK100_GBP-2018-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2018/oanda-UK100_GBP-2018-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2018/oanda-UK100_GBP-2018-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2018/oanda-UK100_GBP-2018-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2018/oanda-UK100_GBP-2018-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2018/oanda-UK100_GBP-2018-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/UK100_GBP/2018/oanda-UK100_GBP-2018-12.csv",
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2005/oanda-US2000_USD-2005-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2005/oanda-US2000_USD-2005-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2005/oanda-US2000_USD-2005-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2005/oanda-US2000_USD-2005-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2005/oanda-US2000_USD-2005-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2005/oanda-US2000_USD-2005-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2005/oanda-US2000_USD-2005-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2005/oanda-US2000_USD-2005-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2005/oanda-US2000_USD-2005-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2005/oanda-US2000_USD-2005-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2005/oanda-US2000_USD-2005-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2005/oanda-US2000_USD-2005-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2006/oanda-US2000_USD-2006-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2006/oanda-US2000_USD-2006-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2006/oanda-US2000_USD-2006-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2006/oanda-US2000_USD-2006-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2006/oanda-US2000_USD-2006-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2006/oanda-US2000_USD-2006-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2006/oanda-US2000_USD-2006-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2006/oanda-US2000_USD-2006-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2006/oanda-US2000_USD-2006-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2006/oanda-US2000_USD-2006-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2006/oanda-US2000_USD-2006-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2006/oanda-US2000_USD-2006-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2007/oanda-US2000_USD-2007-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2007/oanda-US2000_USD-2007-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2007/oanda-US2000_USD-2007-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2007/oanda-US2000_USD-2007-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2007/oanda-US2000_USD-2007-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2007/oanda-US2000_USD-2007-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2007/oanda-US2000_USD-2007-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2007/oanda-US2000_USD-2007-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2007/oanda-US2000_USD-2007-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2007/oanda-US2000_USD-2007-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2007/oanda-US2000_USD-2007-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2007/oanda-US2000_USD-2007-12.csv"
-        },
-        /*{
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2008/oanda-US2000_USD-2008-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2008/oanda-US2000_USD-2008-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2008/oanda-US2000_USD-2008-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2008/oanda-US2000_USD-2008-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2008/oanda-US2000_USD-2008-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2008/oanda-US2000_USD-2008-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2008/oanda-US2000_USD-2008-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2008/oanda-US2000_USD-2008-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2008/oanda-US2000_USD-2008-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2008/oanda-US2000_USD-2008-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2008/oanda-US2000_USD-2008-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2008/oanda-US2000_USD-2008-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2009/oanda-US2000_USD-2009-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2009/oanda-US2000_USD-2009-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2009/oanda-US2000_USD-2009-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2009/oanda-US2000_USD-2009-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2009/oanda-US2000_USD-2009-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2009/oanda-US2000_USD-2009-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2009/oanda-US2000_USD-2009-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2009/oanda-US2000_USD-2009-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2009/oanda-US2000_USD-2009-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2009/oanda-US2000_USD-2009-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2009/oanda-US2000_USD-2009-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2009/oanda-US2000_USD-2009-12.csv"
-        },*/
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2010/oanda-US2000_USD-2010-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2010/oanda-US2000_USD-2010-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2010/oanda-US2000_USD-2010-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2010/oanda-US2000_USD-2010-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2010/oanda-US2000_USD-2010-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2010/oanda-US2000_USD-2010-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2010/oanda-US2000_USD-2010-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2010/oanda-US2000_USD-2010-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2010/oanda-US2000_USD-2010-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2010/oanda-US2000_USD-2010-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2010/oanda-US2000_USD-2010-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2010/oanda-US2000_USD-2010-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2011/oanda-US2000_USD-2011-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2011/oanda-US2000_USD-2011-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2011/oanda-US2000_USD-2011-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2011/oanda-US2000_USD-2011-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2011/oanda-US2000_USD-2011-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2011/oanda-US2000_USD-2011-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2011/oanda-US2000_USD-2011-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2011/oanda-US2000_USD-2011-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2011/oanda-US2000_USD-2011-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2011/oanda-US2000_USD-2011-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2011/oanda-US2000_USD-2011-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2011/oanda-US2000_USD-2011-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2012/oanda-US2000_USD-2012-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2012/oanda-US2000_USD-2012-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2012/oanda-US2000_USD-2012-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2012/oanda-US2000_USD-2012-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2012/oanda-US2000_USD-2012-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2012/oanda-US2000_USD-2012-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2012/oanda-US2000_USD-2012-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2012/oanda-US2000_USD-2012-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2012/oanda-US2000_USD-2012-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2012/oanda-US2000_USD-2012-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2012/oanda-US2000_USD-2012-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2012/oanda-US2000_USD-2012-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2013/oanda-US2000_USD-2013-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2013/oanda-US2000_USD-2013-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2013/oanda-US2000_USD-2013-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2013/oanda-US2000_USD-2013-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2013/oanda-US2000_USD-2013-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2013/oanda-US2000_USD-2013-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2013/oanda-US2000_USD-2013-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2013/oanda-US2000_USD-2013-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2013/oanda-US2000_USD-2013-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2013/oanda-US2000_USD-2013-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2013/oanda-US2000_USD-2013-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2013/oanda-US2000_USD-2013-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2014/oanda-US2000_USD-2014-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2014/oanda-US2000_USD-2014-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2014/oanda-US2000_USD-2014-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2014/oanda-US2000_USD-2014-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2014/oanda-US2000_USD-2014-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2014/oanda-US2000_USD-2014-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2014/oanda-US2000_USD-2014-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2014/oanda-US2000_USD-2014-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2014/oanda-US2000_USD-2014-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2014/oanda-US2000_USD-2014-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2014/oanda-US2000_USD-2014-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2014/oanda-US2000_USD-2014-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2015/oanda-US2000_USD-2015-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2015/oanda-US2000_USD-2015-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2015/oanda-US2000_USD-2015-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2015/oanda-US2000_USD-2015-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2015/oanda-US2000_USD-2015-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2015/oanda-US2000_USD-2015-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2015/oanda-US2000_USD-2015-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2015/oanda-US2000_USD-2015-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2015/oanda-US2000_USD-2015-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2015/oanda-US2000_USD-2015-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2015/oanda-US2000_USD-2015-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2015/oanda-US2000_USD-2015-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2016/oanda-US2000_USD-2016-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2016/oanda-US2000_USD-2016-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2016/oanda-US2000_USD-2016-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2016/oanda-US2000_USD-2016-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2016/oanda-US2000_USD-2016-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2016/oanda-US2000_USD-2016-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2016/oanda-US2000_USD-2016-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2016/oanda-US2000_USD-2016-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2016/oanda-US2000_USD-2016-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2016/oanda-US2000_USD-2016-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2016/oanda-US2000_USD-2016-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2016/oanda-US2000_USD-2016-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2017/oanda-US2000_USD-2017-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2017/oanda-US2000_USD-2017-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2017/oanda-US2000_USD-2017-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2017/oanda-US2000_USD-2017-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2017/oanda-US2000_USD-2017-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2017/oanda-US2000_USD-2017-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2017/oanda-US2000_USD-2017-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2017/oanda-US2000_USD-2017-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2017/oanda-US2000_USD-2017-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2017/oanda-US2000_USD-2017-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2017/oanda-US2000_USD-2017-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2017/oanda-US2000_USD-2017-12.csv"
-        },
-        {
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2018/oanda-US2000_USD-2018-1.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2018/oanda-US2000_USD-2018-2.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2018/oanda-US2000_USD-2018-3.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2018/oanda-US2000_USD-2018-4.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2018/oanda-US2000_USD-2018-5.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2018/oanda-US2000_USD-2018-6.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2018/oanda-US2000_USD-2018-7.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2018/oanda-US2000_USD-2018-8.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2018/oanda-US2000_USD-2018-9.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2018/oanda-US2000_USD-2018-10.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2018/oanda-US2000_USD-2018-11.csv",
-            "../../DB2/archive/pyfinancialdata/data/currencies/oanda/US2000_USD/2018/oanda-US2000_USD-2018-12.csv"
-        }/*,
-        {"../../DB2/archive/pyfinancialdata/data/cryptocurrencies/bitstamp/BTC_USD/2012.csv"},
-        {"../../DB2/archive/pyfinancialdata/data/cryptocurrencies/bitstamp/BTC_USD/2013.csv"},
-        {"../../DB2/archive/pyfinancialdata/data/cryptocurrencies/bitstamp/BTC_USD/2014.csv"},
-        {"../../DB2/archive/pyfinancialdata/data/cryptocurrencies/bitstamp/BTC_USD/2015.csv"},
-        {"../../DB2/archive/pyfinancialdata/data/cryptocurrencies/bitstamp/BTC_USD/2016.csv"},
-        {"../../DB2/archive/pyfinancialdata/data/cryptocurrencies/bitstamp/BTC_USD/2017.csv"},*/
+        // Here you insert a vector for each year fo trading an example of my case:
+        //{
+        //    "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2005/oanda-NAS100_USD-2005-1.csv",
+        //    "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2005/oanda-NAS100_USD-2005-2.csv",
+        //    "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2005/oanda-NAS100_USD-2005-3.csv",
+        //    "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2005/oanda-NAS100_USD-2005-4.csv",
+        //    "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2005/oanda-NAS100_USD-2005-5.csv",
+        //    "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2005/oanda-NAS100_USD-2005-6.csv",
+        //    "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2005/oanda-NAS100_USD-2005-7.csv",
+        //    "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2005/oanda-NAS100_USD-2005-8.csv",
+        //    "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2005/oanda-NAS100_USD-2005-9.csv",
+        //    "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2005/oanda-NAS100_USD-2005-10.csv",
+        //    "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2005/oanda-NAS100_USD-2005-11.csv",
+        //    "../../DB2/archive/pyfinancialdata/data/currencies/oanda/NAS100_USD/2005/oanda-NAS100_USD-2005-12.csv"
+        //}, ...
     };
 
-    
-    // Control d'errors simple
+    // Simple error check
     if (data_set.empty()) {
-        std::cerr << "Dataset buit! Revisa el codi." << std::endl;
+        std::cerr << "Dataset empty! Check the code." << std::endl;
         return 1;
     }
 
     std::vector<pthread_t> thread_ids(data_set.size());
     size_t n_threads = 10; 
     
-    std::cout << "Iniciant simulació amb " << data_set.size() << " elements (" << n_threads << " concurrents)..." << std::endl;
+    std::cout << "Starting simulation with " << data_set.size() << " elements (" << n_threads << " concurrent)..." << std::endl;
 
-    // --- BUCLE CORREGIT: LOTS SENSE DOUBLE JOIN ---
+    // --- CORRECTED LOOP: BATCHES WITHOUT DOUBLE JOIN ---
     
     size_t total_tasks = data_set.size();
     
     for (size_t i = 0; i < total_tasks; i += n_threads) {
         size_t tasks_in_this_batch = 0;
 
-        // 1. CREAR LOT (Respectant el límit del vector)
+        // 1. CREATE BATCH (Respecting vector limits)
         for (size_t j = 0; j < n_threads; j++) {
             size_t current_idx = i + j;
             if (current_idx < total_tasks) {
                 int ret = pthread_create(&thread_ids[current_idx], nullptr, data_feed, (void*)&data_set[current_idx]);
                 if (ret != 0) {
-                    std::cerr << "Error creant thread " << current_idx << std::endl;
+                    std::cerr << "Error creating thread " << current_idx << std::endl;
                     exit(-1);
                 }
                 tasks_in_this_batch++;
             }
         }
 
-        // 2. ESPERAR LOT (JOIN)
-        // Esperem només als que acabem de crear.
+        // 2. WAIT FOR BATCH (JOIN)
+        // We only wait for the ones we just created.
         for (size_t j = 0; j < tasks_in_this_batch; j++) {
             size_t current_idx = i + j;
             pthread_join(thread_ids[current_idx], nullptr);
         }
         
-        std::cout << "\n[Batch acabat: " << (i + tasks_in_this_batch) << "/" << total_tasks << "]" << std::endl;
+        std::cout << "\n[Batch finished: " << (i + tasks_in_this_batch) << "/" << total_tasks << "]" << std::endl;
     }
 
-    // ELIMINAT: El segon bucle de joins global. Ja els hem fet join als lots.
-
     data_file.close();
-    std::cout << "Simulació finalitzada." << std::endl;
+    std::cout << "Simulation finished." << std::endl;
     return 0;
 }
