@@ -132,6 +132,7 @@ void listen_to_brain(int fd_read, float& current_budget, int& shares_owned, doub
     }
 }
 
+//The hands algorithm itself
 void* data_feed(void * arg) {
     std::vector<std::string> *filenames = static_cast<std::vector<std::string>*>(arg);
 
@@ -225,6 +226,7 @@ void* data_feed(void * arg) {
     pthread_exit(nullptr);
 }
 
+//multithreading system
 int main() {
     // IMPORTANTE: Ignorar senyal de trencament de pipe per evitar crash global
     signal(SIGPIPE, SIG_IGN);
